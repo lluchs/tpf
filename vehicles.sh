@@ -1,21 +1,23 @@
 #!/usr/bin/env bash
-### Usage: vehicles.sh <file> <name> ...
+### Usage: vehicles.sh <file> ...
 
-OUTPUT="graph/vehicles.svg"
+. ./lib.sh
+
+OUTPUT=${OUTPUT:-vehicles.svg}
 
 args=()
 names=()
-while (($# >= 2)); do
+while (($# >= 1)); do
 	args+=('<(jq -r "[.date, .vehicleTypes.RAIL.count // 0, .vehicleTypes.AIR.count // 0, .vehicleTypes.ROAD.count // 0, .vehicleTypes.SEA.count // 0] | @tsv" "'$1'")')
-	shift
-	names+=("$1/Rail" "$1/Air" "$1/Road" "$1/Sea")
+	n=$(basename ${1%.*})
+	names+=("$n/Rail" "$n/Air" "$n/Road" "$n/Sea")
 	shift
 done
 
 tmpfile=$(mktemp)
 {
 	echo date ${names[@]}
-	eval join "${args[@]}"
+	eval xjoin "${args[@]}"
 } > "$tmpfile"
 
 gnuplot -e 'file = "'"$tmpfile"'"' -e 'out = "'"$OUTPUT"'"' <(cat <<GNUPLOT

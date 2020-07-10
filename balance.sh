@@ -1,22 +1,26 @@
 #!/usr/bin/env bash
 ### Usage: balance.sh <file> <name> ...
 
-OUTPUT="graph/balance.svg"
+. ./lib.sh
+
+OUTPUT=${OUTPUT:-balance.svg}
 
 args=()
 names=()
-while (($# >= 2)); do
+while (($# >= 1)); do
 	args+=('<(jq -r "[.date, .balance - .loan] | @tsv" "'$1'")')
-	shift
-	names+=("$1")
+	n=$(basename ${1%.*})
+	names+=("$n")
 	shift
 done
 
 tmpfile=$(mktemp)
 {
 	echo date ${names[@]}
-	eval join "${args[@]}"
+	eval xjoin "${args[@]}"
 } > "$tmpfile"
+
+cat "$tmpfile"
 
 gnuplot -e 'file = "'"$tmpfile"'"' -e 'out = "'"$OUTPUT"'"' <(cat <<GNUPLOT
 set term svg

@@ -6,13 +6,25 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
+	"regexp"
 	"sync"
 
 	"github.com/gin-gonic/gin"
 )
 
 var updateMutex sync.Mutex
+
+func runGraphCmd(outfile, script string, args []string) error {
+	cmd := exec.Command(script, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	tmpfile := outfile + ".tmp"
+	cmd.Env = append(cmd.Env, "OUTPUT="+tmpfile)
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	return os.Rename(tmpfile, outfile)
+}
 
 func updateGraphs() {
 	updateMutex.Lock()
@@ -22,28 +34,21 @@ func updateGraphs() {
 		fmt.Println(err)
 		return
 	}
-	args := []string{}
-	for _, file := range files {
-		args = append(args, file)
-		args = append(args, strings.TrimSuffix(filepath.Base(file), filepath.Ext(file)))
-	}
-	fmt.Printf("%v", args)
-	cmd := exec.Command("./balance.sh", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err = cmd.Run()
-	if err != nil {
+	if err = runGraphCmd("graph/balance.svg", "./balance.sh", files); err != nil {
 		fmt.Println(err)
 		return
 	}
-	cmd = exec.Command("./vehicles.sh", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err = cmd.Run()
-	if err != nil {
+	if err = runGraphCmd("graph/vehicles.svg", "./vehicles.sh", files); err != nil {
 		fmt.Println(err)
 		return
 	}
+}
+
+var nameRe = regexp.MustCompile(`^\w+$`)
+
+// validName validates names.
+func validName(name string) bool {
+	return nameRe.MatchString(name)
 }
 
 func main() {
@@ -57,6 +62,10 @@ func main() {
 	})
 	r.POST("/data/:name", func(c *gin.Context) {
 		name := c.Param("name")
+		if !validName(name) {
+			c.String(400, "invalid name")
+			return
+		}
 		f, err := os.OpenFile("data/"+name+".json", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			c.String(500, err.Error())
@@ -73,6 +82,10 @@ func main() {
 	})
 	r.DELETE("/data/:name", func(c *gin.Context) {
 		name := c.Param("name")
+		if !validName(name) {
+			c.String(400, "invalid name")
+			return
+		}
 		err := os.Remove("data/" + name + ".json")
 		if err != nil {
 			c.String(500, err.Error())

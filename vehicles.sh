@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ### Usage: vehicles.sh <file> <name> ...
 
-OUTPUT="graph/vehicles.png"
+OUTPUT="graph/vehicles.svg"
 
 args=()
 names=()
@@ -19,7 +19,7 @@ tmpfile=$(mktemp)
 } > "$tmpfile"
 
 gnuplot -e 'file = "'"$tmpfile"'"' -e 'out = "'"$OUTPUT"'"' <(cat <<GNUPLOT
-set term pngcairo
+set term svg
 set output out
 
 set xdata time

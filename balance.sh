@@ -1,10 +1,24 @@
 #!/usr/bin/env bash
-### Usage: balance.sh <file>
+### Usage: balance.sh <file> <name> ...
 
-INPUT=${1?need input file}
-OUTPUT="balance-${INPUT%.json}.png"
+OUTPUT="graph/balance.png"
 
-gnuplot -e 'file = "'"$INPUT"'"' -e 'out = "'"$OUTPUT"'"' <(cat <<GNUPLOT
+args=()
+names=()
+while (($# >= 2)); do
+	args+=('<(jq -r "[.date, .balance - .loan] | @tsv" "'$1'")')
+	shift
+	names+=("$1")
+	shift
+done
+
+tmpfile=$(mktemp)
+{
+	echo date ${names[@]}
+	eval join "${args[@]}"
+} > "$tmpfile"
+
+gnuplot -e 'file = "'"$tmpfile"'"' -e 'out = "'"$OUTPUT"'"' <(cat <<GNUPLOT
 set term pngcairo
 set output out
 
@@ -13,10 +27,12 @@ set timefmt "%Y-%m-%d"
 set format x "%F"
 set xtics rotate by -45
 
-#unset key
+set key autotitle columnhead
 set title "Money"
 
-plot sprintf("< jq -r '[.date, .balance, .loan] | @tsv' '%s'", file) using 1:2 with lines title "Balance", \
-	"" using 1:3 with lines title "Loan"
+plot for [col=2:*] file using 1:col with lines
+
 GNUPLOT
 )
+
+rm "$tmpfile"
